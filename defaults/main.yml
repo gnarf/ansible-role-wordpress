@@ -1,0 +1,45 @@
+wp_version: 4.3.1
+wp_installs: []
+# - url: REQUIRED: ex: "blog.jquery.com"
+#   path: REQUIRED: path to install wordpress in ex "/var/www/blog.jquery.com"
+#   title: REQUIRED: the title of the blog
+#   version: version to instal, default {{ wp_version }}
+#   wp_config: optional, template to evaluate for wp-config.php
+#   install: default True, can be set to False to skip the wp cli install
+#   admin_user: admin username, default {{ wp_admin_user }}
+#   admin_password: admin password, default {{ wp_admin_password }}
+#   admin_email: admin email, default {{ wp_admin_email }}
+#   db_name: mysql database name, default {{ wp_db_name }}
+#   db_user: mysql database name, default {{ wp_db_user }}
+#   db_password: mysql database name, default {{ wp_db_password }}
+#   plugins: optional array of plugins: ex:
+#     - { name: "google-sitemap-generator", version: "4.0.8" }
+
+
+# WP-CLI bin and url info for downloading
+wp_cli_bin: /usr/bin/wp
+wp_cli_url: https://raw.github.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+
+# Default database config
+wp_db_name: wordpress
+wp_db_user: wordpress
+wp_db_password: secret
+
+# Disable All Updates
+# By default automatic updates are enabled, set this value to true to disable all automatic updates
+wp_auto_up_disable: false
+
+#Define Core Update Level
+#true  = Development, minor, and major updates are all enabled
+#false = Development, minor, and major updates are all disabled
+#minor = Minor updates are enabled, development, and major updates are disabled
+wp_core_update_level: true
+
+wp_admin_user: admin
+wp_admin_password: secret
+wp_admin_email: infrastructure-team@jquery.com
+
+wp_debug: false
+
+php_fpm_pools:
+  - wordpress

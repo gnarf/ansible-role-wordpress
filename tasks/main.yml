@@ -1,0 +1,107 @@
+- name: install apt packages
+  apt: name={{ item }} state=present update_cache=true
+  with_items:
+    - php5-cli
+    - curl
+  tags:
+    wp-install
+
+- name: install wp-cli
+  get_url: url={{wp_cli_url}} dest={{wp_cli_bin}} mode=0755
+  tags:
+    wp-install
+
+- name: Create WordPress database
+  mysql_db: name={{ item.db_name | default(wp_db_name) }} state=present
+  with_items: wp_installs
+  tags:
+    wp-install
+
+- name: Create WordPress database user
+  with_items: wp_installs
+  mysql_user:
+  args:
+    name: "{{ item.db_user | default(wp_db_user) }}"
+    password: "{{ item.db_password | default(wp_db_password) }}"
+    priv: "{{ item.db_name | default(wp_db_name) }}.*:ALL"
+    host: "localhost"
+    state: "present"
+    append_privs: yes
+  tags:
+    wp-install
+
+- name: Create folder for wordpress install
+  with_items: wp_installs
+  file: path={{ item.path }} state=directory owner=www-data group=www-data
+  tags:
+    wp-install
+
+- name: "Add host to /etc/hosts"
+  lineinfile: dest=/etc/hosts line="127.0.0.1 {{ item.url }}" owner=root group=root mode=0644
+  with_items: wp_installs
+
+- name: download wordpress
+  with_items: wp_installs
+  become_user: www-data
+  command: wp core download --path={{item.path}} --version={{ item.version | default(wp_version) }}
+  args:
+    creates: "{{item.path}}/index.php"
+  tags:
+    wp-install
+
+- name: install salts
+  with_items: wp_installs
+  become_user: www-data
+  shell: (echo "<?php" ; curl https://api.wordpress.org/secret-key/1.1/salt/ ) > {{item.path}}/wp-salt.php
+  args:
+    creates: "{{item.path}}/wp-salt.php"
+  tags:
+    wp-install
+
+- name: Copy wp-config.php
+  with_items: wp_installs
+  template: src={{ item.wp_config | default("wp-config.php.j2") }} dest={{ item.path }}/wp-config.php owner=www-data
+  tags:
+    wp-install
+
+- name: Install robots.txt (non-production)
+  with_items: wp_installs
+  when: deploy_env != 'production'
+  copy: src=no-robots.txt dest={{ item.path }}/robots.txt owner=www-data
+
+- name: Is wordpress installed
+  with_items: wp_installs
+  become_user: www-data
+  register: wp_is_installed
+  changed_when: false
+  command: wp core is-installed --path={{ item.path }}
+  ignore_errors: true
+  when: item.install | default(True)
+  tags:
+    wp-install
+
+- name: Install wordpress
+  with_together:
+    - wp_is_installed.results
+    - wp_installs
+  become_user: www-data
+  command: wp core install --path={{ item.1.path }} --url={{ item.1.url }} --title="{{ item.1.title }}" --admin_user={{item.1.admin_user | default(wp_admin_user) }} --admin_password={{item.1.admin_password | default(wp_admin_password)}} --admin_email={{item.1.admin_email | default(wp_admin_email)}}
+  when: item.1.install | default( True ) and item.0.rc != 0
+  no_log: true
+  tags:
+    wp-install
+
+- name: Wordpress nginx site
+  with_items: wp_installs
+  template: src="nginx/wordpress.conf.j2" dest="/etc/nginx/sites-enabled/{{ item.url }}.conf"
+  notify: reload nginx
+  when: item.nginx | default(True)
+
+- name: install wordpress plugins
+  become_user: www-data
+  command: wp plugin install {{item.1.name}} --version={{item.1.version}} --activate --path={{item.0.path}}
+  args:
+    creates: "{{item.0.path}}/wp-content/plugins/{{item.1.name}}"
+  with_subelements:
+    - wp_installs
+    - plugins
